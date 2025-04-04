@@ -2,10 +2,12 @@
 #include "VWAPCalc.hpp"
 
 
-VWAPCalc::VWAPCalc() :
+VWAPCalc::VWAPCalc(const uint32_t price, const uint32_t shares) :
     total_shares{0},
     total_value{0}
-{}
+{
+    updateVWAP(price, shares);
+}
 
 void VWAPCalc::updateVWAP(const uint32_t price, const uint32_t shares)
 {

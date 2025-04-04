@@ -6,7 +6,7 @@ class VWAPCalc
 
 public:
 
-    VWAPCalc();
+    VWAPCalc(const uint32_t price, const uint32_t shares);
 
     ~VWAPCalc(){}
 
