@@ -6,11 +6,13 @@ class VWAPCalc
 
 public:
 
-    VWAPCalc(const uint32_t price, const uint32_t shares);
+    VWAPCalc(const uint32_t price, const uint64_t shares);
 
     ~VWAPCalc(){}
 
-    void updateVWAP(const uint32_t price, const uint32_t shares);
+    void updateVWAP(const uint32_t price, const uint64_t shares);
+
+    void processBrokenTrade(const uint32_t price, const uint64_t shares);
 
     double getVWAP();
 

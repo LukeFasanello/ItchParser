@@ -52,14 +52,84 @@ struct TypeE {
     uint64_t match_num;
 };
 
-//Order reference data needed for potential broken trades
-struct OrderReference {
+//Type C message
+struct TypeC {
+    // 8
+    uint64_t order_ref;
     // 4
     uint32_t shares;
+    // 8
+    uint64_t match_num;
+    // 1
+    char printable;
+    // 4
+    uint32_t price;
+};
+
+//Type X message
+struct TypeX {
+    // 8
+    uint64_t order_ref;
+    // 4
+    uint32_t cancelled_shares;
+};
+
+//Type U message
+struct TypeU {
+    // 8
+    uint64_t orig_order_ref;
+    // 8
+    uint64_t new_order_ref;
+    // 4
+    uint32_t new_shares;
+    // 4
+    uint32_t new_price;
+};
+
+//Type P message
+struct TypeP {
+    // 8
+    uint64_t order_ref;
+    // 8
+    char buy_sell;
+    // 4
+    uint32_t shares;
+    // 8
+    char stock[8];
     // 4
     uint32_t price;
     // 8
-    std::string stock_symbol;
+    uint64_t match_num;
+};
+
+//Type Q message
+struct TypeQ {
+    // 8
+    uint64_t shares;
+    // 8
+    char stock[8];
+    // 4
+    uint32_t price;
+    // 8
+    uint64_t match_num;
+    // 1
+    char cross_type;
+};
+
+//Order reference data needed for potential broken trades
+struct OrderReference {
+    //8
+    uint64_t shares;
+    //4
+    uint32_t price;
+    //8
+    char stock[8];
+
+    OrderReference(uint64_t s, uint32_t p, const char* sym) : shares(s), price(p) {
+        std::memcpy(stock, sym, 8);
+    }
+    
+    OrderReference() = default;
 };
 
 #pragma pack(pop)

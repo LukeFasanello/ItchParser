@@ -5,22 +5,30 @@
 #include <vector>
 #include <cstdint>
 #include <arpa/inet.h>
+#include <iomanip>
+#include <sstream>
 
 //-------------------------------------------------------------------------------------------------
 ItchParser::ItchParser() :
     order_book{},
     vwap_map{},
-    executed_trade_book{}
+    executed_trade_book{},
+    curr_time{}
 {
+
+    order_book.reserve(1'000'000);
+    vwap_map.reserve(10'000);
+    executed_trade_book.reserve(1'000'000);
+
     logFile.open("logging.txt");
 
     if (!logFile)
     {
-        std::cerr << "Log File not opened" << std::endl;
+        std::cerr << "Log File not opened\n";
     }
     else
     {
-        logFile << "Log File Opened" << std::endl;
+        logFile << "Log File Opened\n";
     }
 
 }
@@ -37,12 +45,54 @@ std::string ItchParser::charToString(const char* p_orig, size_t p_length)
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string ItchParser::formatTimestamp(uint64_t nanoseconds)
+{
+    uint64_t total_seconds = nanoseconds / 1'000'000'000;
+    uint64_t hours   = total_seconds / 3600;
+    uint64_t minutes = (total_seconds % 3600) / 60;
+    uint64_t seconds = total_seconds % 60;
+
+    uint64_t millis = (nanoseconds / 1'000'000) % 1000;
+    uint64_t micros = (nanoseconds / 1'000) % 1000;
+
+    std::ostringstream oss;
+    oss << std::setfill('0')
+        << std::setw(2) << hours << ":"
+        << std::setw(2) << minutes << ":"
+        << std::setw(2) << seconds << "."
+        << std::setw(3) << millis
+        << std::setw(3) << micros; // append microseconds for more detail
+
+    return oss.str();
+
+}
+
+//-------------------------------------------------------------------------------------------------
 void ItchParser::printVWAPMap()
 {
+    std::cout << "Logging VWAPS at Time:" << formatTimestamp(curr_time) << '\n';
+    logFile << "VWAPs at Time: " << formatTimestamp(curr_time) << '\n';
 
     for (auto it = vwap_map.begin(); it != vwap_map.end(); ++it)
     {
-        std::cout << it->first << ": " << it->second.getVWAP() << std::endl;
+        logFile << charToString(it->first.data(), 8) << ": " << it->second.getVWAP() << '\n';
+    }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ItchParser::updateVWAP(const char* stock, uint32_t price, uint64_t shares)
+{
+    StockSymbol stock_symbol;
+    std::memcpy(stock_symbol.data(), stock, 8);
+
+    auto it = vwap_map.find(stock_symbol);
+    if (it != vwap_map.end())
+    {
+        it->second.updateVWAP(price, shares);
+    }
+    else
+    {
+        vwap_map.try_emplace(stock_symbol, price, shares);
     }
 }
 
@@ -54,13 +104,13 @@ void ItchParser::parseFile(std::string filePath)
 
     if (!itch_file)
     {
-        std::cout << "Itch File not opened" << std::endl;
+        std::cout << "Itch File not opened\n";
         return;
     }
 
-    std::cout << "Itch file opened successfully" << std::endl;
+    std::cout << "Itch file opened successfully\n";
 
-    while(itch_file)
+    while(itch_file.good())
     {
         ITCHMessageHeader msg_header;
         if (readMessageHeader(itch_file, msg_header))
@@ -68,11 +118,11 @@ void ItchParser::parseFile(std::string filePath)
             if (MESSAGE_TYPES.find(msg_header.msgType) != MESSAGE_TYPES.end())
             {
 
-                //Print every half hour
-                if (curr_time + 1800000000000 <= msg_header.time_stamp)
+                //Print every hour hour
+                if (curr_time + 3600000000000 <= msg_header.time_stamp)
                 {
-                    printVWAPMap();
                     curr_time = msg_header.time_stamp;
+                    printVWAPMap();
                 }
 
                 bool loop_break = false;
@@ -81,17 +131,33 @@ void ItchParser::parseFile(std::string filePath)
 
                     case 'S':
                     {
-                        logFile << "System event!" << std::endl;
-                        itch_file.ignore(msg_header.msg_size - static_cast<u_int8_t>(11));
+                        if (!processS(itch_file))
+                        {
+                            loop_break = true;
+                        }
+
                         break;
                     }
 
                     case 'A':
                     {
-                        if (!processA(itch_file))
+                        if (!processAorF(itch_file))
                         {
                             loop_break = true;
                         }
+
+                        break;
+                    }
+
+                    case 'F':
+                    {
+                        if (!processAorF(itch_file))
+                        {
+                            loop_break = true;
+                        }
+
+                        //Ignore the attribution
+                        itch_file.ignore(size_t(4));
 
                         break;
                     }
@@ -105,9 +171,71 @@ void ItchParser::parseFile(std::string filePath)
                         break;
                     }
 
+                    case 'C':
+                    {
+                        if (!processC(itch_file))
+                        {
+                            loop_break = true;
+                        }
+                        break;
+                    }
+
+                    case 'X':
+                    {
+                        if (!processX(itch_file))
+                        {
+                            loop_break = true;
+                        }
+                        break;
+                    }
+
+                    case 'D':
+                    {
+                        if (!processD(itch_file))
+                        {
+                            loop_break = true;
+                        }
+                        break;
+                    }
+
+                    case 'U':
+                    {
+                        if (!processU(itch_file))
+                        {
+                            loop_break = true;
+                        }
+                        break;
+                    }
+
+                    case 'P':
+                    {
+                        if (!processP(itch_file))
+                        {
+                            loop_break = true;
+                        }
+                        break;
+                    }
+
+                    case 'Q':
+                    {
+                        if (!processQ(itch_file))
+                        {
+                            loop_break = true;
+                        }
+                        break;
+                    }
+
+                    case 'B':
+                    {
+                        if (!processB(itch_file))
+                        {
+                            loop_break = true;
+                        }
+                        break;
+                    }
+
                     default:
                     {
-                        //TODO: Uncomment here once we have processing for messages we want. This will allow us to ignore messages we don't care about
                         itch_file.ignore(msg_header.msg_size - static_cast<u_int8_t>(11));
                         break;
                     }
@@ -123,7 +251,7 @@ void ItchParser::parseFile(std::string filePath)
     
             else
             {
-                std::cout << "Unknown Message Encountered" << std::endl;
+                std::cout << "Unknown Message Encountered\n";
                 break;
             }
         }
@@ -133,7 +261,7 @@ void ItchParser::parseFile(std::string filePath)
         }
     }
 
-    std::cout << "Closing Itch File" << std::endl;
+    std::cout << "Closing Itch File\n";
 
 }
 
@@ -142,7 +270,7 @@ bool ItchParser::readMessageHeader(std::ifstream &file, ITCHMessageHeader &heade
 {
     if (!file.read(reinterpret_cast<char*>(&header), 7))
     {
-        std::cout << "Could not read msgType, locate, and tracking_num" << std::endl;
+        std::cout << "Could not read msgType, locate, and tracking_num\n";
         return false;
     }
 
@@ -154,7 +282,7 @@ bool ItchParser::readMessageHeader(std::ifstream &file, ITCHMessageHeader &heade
     if (!file.read(reinterpret_cast<char*>(&ts_raw) + 2, 6))
     {
 
-        std::cout << "Could not read timestamp" << std::endl;
+        std::cout << "Could not read timestamp\n";
         return false;
 
     }
@@ -163,17 +291,61 @@ bool ItchParser::readMessageHeader(std::ifstream &file, ITCHMessageHeader &heade
     return true;
 }
 
-//TODO: Implement
 //-------------------------------------------------------------------------------------------------
-bool ItchParser::processA(std::ifstream &file)
+bool ItchParser::processS(std::ifstream &file)
 {
-    logFile << "Add Order!" << std::endl;
+    char event_code;
+    if (!file.read(&event_code, sizeof(event_code)))
+    {
+        std::cout << "Could not read type A/F message\n";
+        return false;
+    }
+
+    switch(event_code)
+    {
+        case 'O':
+            logFile << "Start of Messages\n";
+            std::cout << "Start of Messages\n";
+            break;
+        case 'S':
+            logFile << "Start of System hours\n";
+            std::cout << "Start of System hours\n";
+            break;
+        case 'Q':
+            logFile << "Start of Market hours\n";
+            std::cout << "Start of Market hours\n";
+            break;
+        case 'M':
+            logFile << "End of Market hours\n";
+            std::cout << "End of Market hours\n";
+            break;
+        case 'E':
+            logFile << "End of System hours\n";
+            std::cout << "End of System hours\n";
+            break;
+        case 'C':
+            logFile << "End of Messages\n";
+            std::cout << "End of Messages\n";
+            return false;
+            break;
+        default:
+            logFile << "Unrecognized Event Code\n";
+            std::cout << "Unrecognized Event Code\n";
+            break;
+    }
+
+    return true;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool ItchParser::processAorF(std::ifstream &file)
+{
 
     //We've read the message header, we now need to read the rest of the contents of the message
     TypeA msg;
-    if (!file.read(reinterpret_cast<char*>(&msg), 25))
+    if (!file.read(reinterpret_cast<char*>(&msg), sizeof(msg)))
     {
-        std::cout << "Could not read type A message" << std::endl;
+        std::cout << "Could not read type A/F message\n";
         return false;
     }
 
@@ -182,24 +354,19 @@ bool ItchParser::processA(std::ifstream &file)
     msg.shares = ntohl(msg.shares);
     msg.price = ntohl(msg.price);
 
-    //TODO: Potential optimization we could make here by not storing the entire type A message
-    order_book.emplace(msg.order_ref, msg);
-    logFile << msg.order_ref << std::endl;
+    order_book.try_emplace(msg.order_ref, msg.shares, msg.price, msg.stock);
 
     return true;
 
 }
 
-//TODO: Implement
 //-------------------------------------------------------------------------------------------------
 bool ItchParser::processE(std::ifstream &file)
 {
-    logFile << "Execute Order!" << std::endl;
-
     TypeE msg;
-    if (!file.read(reinterpret_cast<char*>(&msg), 20))
+    if (!file.read(reinterpret_cast<char*>(&msg), sizeof(msg)))
     {
-        std::cout << "Could not read type E message" << std::endl;
+        std::cout << "Could not read type E message\n";
         return false;
     }
 
@@ -208,43 +375,286 @@ bool ItchParser::processE(std::ifstream &file)
     msg.shares = ntohl(msg.shares);
     msg.match_num = __builtin_bswap64(msg.match_num);
 
-    //TODO: Modify Order book
+    //Modify Order book
     auto it = order_book.find(msg.order_ref);
     if (it != order_book.end())
     {
+        updateVWAP(it->second.stock, it->second.price, msg.shares);
 
-        //Modify VWAP for stock
-        std::string stock_symbol = charToString(it->second.stock, sizeof(it->second.stock));
-        auto vwap_it = vwap_map.find(stock_symbol);
-        if (vwap_it != vwap_map.end())
+        executed_trade_book.try_emplace(msg.match_num, msg.shares, it->second.price, it->second.stock);
+
+        //Subtract the shares from the order executed message from the shares in the order
+        if (it->second.shares < msg.shares)
         {
-            //Take the price from the order book, shares from the execute order message
-            vwap_it->second.updateVWAP(it->second.price, msg.shares);
+            logFile << "Warning: Trying to subtract more shares than available\n";
+            order_book.erase(it);
         }
 
         else
         {
-            vwap_map.emplace(stock_symbol, VWAPCalc(it->second.price, msg.shares));
-        }
+            it->second.shares -= msg.shares;
 
-        //TODO: Add executed order to executed order book
-        executed_trade_book.emplace(msg.match_num, OrderReference{msg.shares, it->second.price, stock_symbol});
-
-
-        //Subtract the shares from the order executed message from the shares in the order
-        it->second.shares -= msg.shares;
-
-        if (it->second.shares == 0)
-        {
-            order_book.erase(it);
+            if (it->second.shares == 0)
+            {
+                order_book.erase(it);
+            }
         }
     }
     else
     {
-        logFile << "Message with Order Reference " << msg.order_ref <<
-        " not found in order book" << std::endl;
+        // logFile << "Process E - Message with Order Reference " << msg.order_ref <<
+        // " not found in order book\n";
     }
 
+
+    return true;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool ItchParser::processC(std::ifstream &file)
+{
+    // logFile << "processC\n";
+
+    TypeC msg;
+    if (!file.read(reinterpret_cast<char*>(&msg), sizeof(msg)))
+    {
+        std::cout << "Could not read type C message\n";
+        return false;
+    }
+
+    //Convert to little endian
+    msg.order_ref = __builtin_bswap64(msg.order_ref);
+    msg.shares = ntohl(msg.shares);
+    msg.match_num = __builtin_bswap64(msg.match_num);
+    msg.price = ntohl(msg.price);
+
+    //Modify Order book
+    auto it = order_book.find(msg.order_ref);
+    if (it != order_book.end())
+    {
+        StockSymbol stock_symbol;
+        std::memcpy(stock_symbol.data(), it->second.stock, 8);
+
+        //Only update the vwap if this message is printable
+        if ('Y' == msg.printable)
+        {
+            updateVWAP(it->second.stock, msg.price, msg.shares);
+        }
+
+        executed_trade_book.try_emplace(msg.match_num, msg.shares, msg.price, it->second.stock);
+
+        //Subtract the shares from the order executed message from the shares in the order
+        if (it->second.shares < msg.shares)
+        {
+            logFile << "Warning: Trying to subtract more shares than available\n";
+            order_book.erase(it);
+        }
+
+        else
+        {
+            it->second.shares -= msg.shares;
+            
+            if (it->second.shares == 0)
+            {
+                order_book.erase(it);
+            }
+        }
+    }
+    else
+    {
+        // logFile << "Process C - Message with Order Reference " << msg.order_ref <<
+        // " not found in order book\n";
+    }
+
+
+    return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool ItchParser::processX(std::ifstream &file)
+{
+
+    TypeX msg;
+    if (!file.read(reinterpret_cast<char*>(&msg), sizeof(msg)))
+    {
+        std::cout << "Could not read type X message\n";
+        return false;
+    }
+
+    //Convert to little endian
+    msg.order_ref = __builtin_bswap64(msg.order_ref);
+    msg.cancelled_shares = ntohl(msg.cancelled_shares);
+
+    //Find the message order reference in the book
+    auto it = order_book.find(msg.order_ref);
+    if (it != order_book.end())
+    {
+        //Subtract the shares from the order executed message from the shares in the order
+        if (it->second.shares < msg.cancelled_shares)
+        {
+            logFile << "Warning: Trying to subtract more shares than available\n";
+            it->second.shares = 0;
+        }
+
+        else
+        {
+            it->second.shares -= msg.cancelled_shares;
+        }
+    }
+    else
+    {
+        // logFile << "Process X - Message with Order Reference " << msg.order_ref <<
+        // " not found in order book\n";
+    }
+
+    return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool ItchParser::processD(std::ifstream &file)
+{
+
+    uint64_t order_ref;
+    if (!file.read(reinterpret_cast<char*>(&order_ref), sizeof(order_ref)))
+    {
+        std::cout << "Could not read type D message\n";
+        return false;
+    }
+
+    //Convert to little endian
+    order_ref = __builtin_bswap64(order_ref);
+
+    //Find the message order reference in the book
+    auto it = order_book.find(order_ref);
+    if (it != order_book.end())
+    {
+        order_book.erase(it);
+    }
+    else
+    {
+        // logFile << "Process D - Message with Order Reference " << order_ref <<
+        // " not found in order book\n";
+    }
+
+    return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool ItchParser::processU(std::ifstream &file)
+{
+
+    TypeU msg;
+    if (!file.read(reinterpret_cast<char*>(&msg), sizeof(msg)))
+    {
+        std::cout << "Could not read type U message\n";
+        return false;
+    }
+
+    //Convert to little endian
+    msg.orig_order_ref = __builtin_bswap64(msg.orig_order_ref);
+    msg.new_order_ref = __builtin_bswap64(msg.new_order_ref);
+    msg.new_shares = ntohl(msg.new_shares);
+    msg.new_price = ntohl(msg.new_price);
+
+    auto it = order_book.find(msg.orig_order_ref);
+    if (it != order_book.end())
+    {
+        order_book.try_emplace(msg.new_order_ref, msg.new_shares, msg.new_price, it->second.stock);
+        order_book.erase(it);
+    }
+    else
+    {
+        // logFile << "Process U - Message with Order Reference " << msg.orig_order_ref <<
+        // " not found in order book\n";
+    }
+
+    return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool ItchParser::processP(std::ifstream &file)
+{
+
+    TypeP msg;
+    if (!file.read(reinterpret_cast<char*>(&msg), sizeof(msg)))
+    {
+        std::cout << "Could not read type P message\n";
+        return false;
+    }
+
+    //Convert to little endian
+    msg.order_ref = __builtin_bswap64(msg.order_ref);
+    msg.shares = ntohl(msg.shares);
+    msg.price = ntohl(msg.price);
+    msg.match_num = __builtin_bswap64(msg.match_num);
+
+    updateVWAP(msg.stock, msg.price, msg.shares);
+
+    //Add executed order to executed order book
+    executed_trade_book.try_emplace(msg.match_num, msg.shares, msg.price, msg.stock);
+
+    return true;
+
+}
+
+//-------------------------------------------------------------------------------------
+bool ItchParser::processQ(std::ifstream &file)
+{
+    TypeQ msg;
+    if (!file.read(reinterpret_cast<char*>(&msg), sizeof(msg)))
+    {
+        std::cout << "Could not read type Q message\n";
+        return false;
+    }
+
+    //Convert to little endian
+    msg.shares = __builtin_bswap64(msg.shares);
+    msg.price = ntohl(msg.price);
+    msg.match_num = __builtin_bswap64(msg.match_num);
+
+    if (msg.shares > 0)
+    {
+        updateVWAP(msg.stock, msg.price, msg.shares);
+        executed_trade_book.try_emplace(msg.match_num, msg.shares, msg.price, msg.stock);
+    }
+
+    return true;
+
+}
+
+//-------------------------------------------------------------------------------------
+bool ItchParser::processB(std::ifstream &file)
+{
+
+    uint64_t match_num;
+    if (!file.read(reinterpret_cast<char*>(&match_num), sizeof(match_num)))
+    {
+        std::cout << "Could not read type B message\n";
+        return false;
+    }
+
+    //Convert to little endian
+    match_num = __builtin_bswap64(match_num);
+
+    //Find the message order reference in the book
+    auto it = executed_trade_book.find(match_num);
+    if (it != executed_trade_book.end())
+    {
+        StockSymbol stock_symbol;
+        std::memcpy(stock_symbol.data(), it->second.stock, 8);
+        auto vwap_it = vwap_map.find(stock_symbol);
+        if (vwap_it != vwap_map.end())
+        {
+            vwap_it->second.processBrokenTrade(it->second.price, it->second.shares);
+        }
+
+        executed_trade_book.erase(it);
+    }
+    else
+    {
+        logFile << "Process B - Message with Order Reference " << match_num <<
+        " not found in order book\n";
+    }
 
     return true;
 }
