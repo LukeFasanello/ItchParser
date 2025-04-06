@@ -4,9 +4,12 @@
 
 int main() {
 
+    std::string path;
+    std::cout << "Enter ITCH file path: ";
+    std::getline(std::cin, path);
+
     //TODO: Allow user to enter the path of the file they want to parse
     ItchParser parser;
-    parser.parseFile("/Users/lukefasanello/Desktop/ItchParserProject/ItchParser/Data/01302019.NASDAQ_ITCH50");
-
+    parser.parseFile(path);
     return 0;
 }

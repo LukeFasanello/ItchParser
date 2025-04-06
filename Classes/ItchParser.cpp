@@ -104,7 +104,7 @@ void ItchParser::parseFile(std::string filePath)
 
     if (!itch_file)
     {
-        std::cout << "Itch File not opened\n";
+        std::cout << "Itch File could not be opened\n";
         return;
     }
 
