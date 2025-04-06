@@ -6,7 +6,7 @@
 
 const uint8_t MESSAGE_HEADER_SIZE = 11;
 
-// Denotes the message size in bytes for each message type
+// Holds all message types
 const std::unordered_set<char> MESSAGE_TYPES = {
     'S', 'R','H', 'Y', 'L', 'V', 'W', 'K', 'J', 'h',
     'A', 'F', 'E', 'C', 'X', 'D', 'U', 'P', 'Q', 'B', 'I',
@@ -116,7 +116,7 @@ struct TypeQ {
     char cross_type;
 };
 
-//Order reference data needed for potential broken trades
+//Order reference data
 struct OrderReference {
     //8
     uint64_t shares;
@@ -125,8 +125,8 @@ struct OrderReference {
     //8
     char stock[8];
 
-    OrderReference(uint64_t s, uint32_t p, const char* sym) : shares(s), price(p) {
-        std::memcpy(stock, sym, 8);
+    OrderReference(uint64_t shares, uint32_t price, const char* stock_symbol) : shares(shares), price(price) {
+        std::memcpy(stock, stock_symbol, 8);
     }
     
     OrderReference() = default;

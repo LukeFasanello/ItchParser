@@ -10,15 +10,19 @@ class ItchParser
 {
     public:
 
+        //Constructor
         ItchParser();
 
+        //Empty destructor
         ~ItchParser(){}
 
+        //Parse the itch file
         void parseFile(std::string filePath);
 
 
     private:
 
+        //Read the message header
         bool readMessageHeader(std::ifstream &file, ITCHMessageHeader &header);
 
         //Convert a char array to a std::string
@@ -30,7 +34,7 @@ class ItchParser
         //Print the vwap_map
         void printVWAPMap();
 
-        // Process System Event – No MPID Attribution
+        // Process System Event
         bool processS(std::ifstream &file);
 
         // Process Add Order – No MPID Attribution
@@ -63,7 +67,7 @@ class ItchParser
         //Update the VWAP for a stock
         void updateVWAP(const char* stock, uint32_t price, uint64_t shares);
 
-        //Order Book - Key: Order Reference, Value: Order Struct
+        //Order Book - Key: Order Reference, Value: OrderReference Struct
         std::unordered_map<uint64_t, OrderReference> order_book;
 
         //StockSymbol

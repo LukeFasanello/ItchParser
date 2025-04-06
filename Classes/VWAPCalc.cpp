@@ -29,9 +29,7 @@ void VWAPCalc::processBrokenTrade(const uint32_t price, const uint64_t shares)
     }
 
     total_shares -= shares;
-
-    //Static cast to prevent overflow
-    total_value -= static_cast<uint64_t>(price) * shares;
+    total_value -= sub;
 }
 
 double VWAPCalc::getVWAP()

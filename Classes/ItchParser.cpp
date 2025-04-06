@@ -61,7 +61,7 @@ std::string ItchParser::formatTimestamp(uint64_t nanoseconds)
         << std::setw(2) << minutes << ":"
         << std::setw(2) << seconds << "."
         << std::setw(3) << millis
-        << std::setw(3) << micros; // append microseconds for more detail
+        << std::setw(3) << micros;
 
     return oss.str();
 
@@ -297,7 +297,7 @@ bool ItchParser::processS(std::ifstream &file)
     char event_code;
     if (!file.read(&event_code, sizeof(event_code)))
     {
-        std::cout << "Could not read type A/F message\n";
+        std::cout << "Could not read type S message\n";
         return false;
     }
 
@@ -413,7 +413,6 @@ bool ItchParser::processE(std::ifstream &file)
 //-------------------------------------------------------------------------------------------------
 bool ItchParser::processC(std::ifstream &file)
 {
-    // logFile << "processC\n";
 
     TypeC msg;
     if (!file.read(reinterpret_cast<char*>(&msg), sizeof(msg)))
@@ -432,8 +431,6 @@ bool ItchParser::processC(std::ifstream &file)
     auto it = order_book.find(msg.order_ref);
     if (it != order_book.end())
     {
-        StockSymbol stock_symbol;
-        std::memcpy(stock_symbol.data(), it->second.stock, 8);
 
         //Only update the vwap if this message is printable
         if ('Y' == msg.printable)
@@ -652,8 +649,8 @@ bool ItchParser::processB(std::ifstream &file)
     }
     else
     {
-        logFile << "Process B - Message with Order Reference " << match_num <<
-        " not found in order book\n";
+        // logFile << "Process B - Message with Order Reference " << match_num <<
+        // " not found in order book\n";
     }
 
     return true;
