@@ -1,6 +1,8 @@
 #pragma once
 
 #include "VWAPCalc.hpp"
+#include <array>
+#include <cstring>
 #include "../Messages/MessageStructures.hpp"
 
 #include <string>
