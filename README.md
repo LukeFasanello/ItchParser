@@ -1,5 +1,7 @@
 # ItchParser
 
+![CI](https://github.com/LukeFasanello/ItchParser/actions/workflows/ci.yml/badge.svg)
+
 Parses trades from a NASDAQ ITCH 5.0 tick data file and outputs 
 a running volume-weighted average price (VWAP) for each stock 
 at every hour including market close.
