@@ -19,7 +19,7 @@ class ItchParser
         ~ItchParser(){}
 
         //Parse the itch file
-        void parseFile(std::string filePath);
+        size_t parseFile(std::string filePath);
 
 
     private:

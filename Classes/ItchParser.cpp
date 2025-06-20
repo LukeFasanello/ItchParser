@@ -7,6 +7,8 @@
 #include <arpa/inet.h>
 #include <iomanip>
 #include <sstream>
+#include <filesystem>
+namespace fs = std::filesystem;
 
 //-------------------------------------------------------------------------------------------------
 ItchParser::ItchParser() :
@@ -19,17 +21,6 @@ ItchParser::ItchParser() :
     order_book.reserve(1'000'000);
     vwap_map.reserve(10'000);
     executed_trade_book.reserve(1'000'000);
-
-    logFile.open("logging.txt");
-
-    if (!logFile)
-    {
-        std::cerr << "Log File not opened\n";
-    }
-    else
-    {
-        logFile << "Log File Opened\n";
-    }
 
 }
 
@@ -97,18 +88,36 @@ void ItchParser::updateVWAP(const char* stock, uint32_t price, uint64_t shares)
 }
 
 //-------------------------------------------------------------------------------------------------
-void ItchParser::parseFile(std::string filePath)
-{
+size_t ItchParser::parseFile(std::string filePath)
+{ 
+
+    /* ---------- build Output/<input-stem>.log ---------- */
+    fs::path in  = filePath;                      // "/path/to/01302019.itch"
+    fs::path outDir = "Output";                    // relative; can be absolute
+    fs::create_directories(outDir);                // safe: does nothing if exists
+
+    fs::path logPath = outDir / (in.stem().string() + ".log");
+    //  -> "Output/01302019.log"
+
+    logFile.open(logPath, std::ios::out);          // replace "logging.txt"
+    if (!logFile) {
+        std::cerr << "Could not open " << logPath << '\n';
+        return 0;
+    }
+    logFile << "Log file opened for " << in.filename() << '\n';
+    logFile.flush();
 
     std::ifstream itch_file(filePath, std::ios::binary);
 
     if (!itch_file)
     {
         std::cout << "Itch File could not be opened\n";
-        return;
+        return 0;
     }
 
     std::cout << "Itch file opened successfully\n";
+
+    std::size_t msgCount = 0;
 
     while(itch_file.good())
     {
@@ -117,7 +126,6 @@ void ItchParser::parseFile(std::string filePath)
         {
             if (MESSAGE_TYPES.find(msg_header.msgType) != MESSAGE_TYPES.end())
             {
-
                 //Print every hour hour
                 if (curr_time + 3600000000000 <= msg_header.time_stamp)
                 {
@@ -242,6 +250,7 @@ void ItchParser::parseFile(std::string filePath)
 
                 }
 
+                ++msgCount;
                 //We were unable to read a message
                 if (loop_break)
                 {
@@ -262,6 +271,8 @@ void ItchParser::parseFile(std::string filePath)
     }
 
     std::cout << "Closing Itch File\n";
+    logFile.flush();
+    return msgCount;
 
 }
 
