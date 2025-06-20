@@ -1,0 +1,40 @@
+name: CI                   # ← Friendly name shown in the Actions tab
+
+# ---------------------------------------------------------------
+# When to run this workflow
+# ---------------------------------------------------------------
+on: [push, pull_request]   # ← Every push & every PR against any branch
+
+# ---------------------------------------------------------------
+# A workflow = one or more 'jobs'
+# Here we need just one job called `build`
+# ---------------------------------------------------------------
+jobs:
+  build:
+    # -----------------------------------------------------------
+    # Where the job runs
+    # -----------------------------------------------------------
+    runs-on: ubuntu-latest   # ← Free Ubuntu VM with gcc / clang / cmake pre-installed
+
+    # -----------------------------------------------------------
+    # A job = a list of 'steps' executed in order
+    # -----------------------------------------------------------
+    steps:
+      # 1. Check out your repository
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # 2. Configure the CMake build (out-of-source in ./build)
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DITCH_BUILD_TESTS=ON
+
+      # 3. Compile ( cmake --build uses Ninja/Make depending on the generator)
+      - name: Build
+        run: cmake --build build -- -j
+
+      # 4. Run all tests registered with add_test()
+      - name: Run unit tests
+        run: ctest --test-dir build --output-on-failure
